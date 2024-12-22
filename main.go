@@ -14,6 +14,7 @@ import (
 )
 
 var (
+	// TODO: tidy up styles
 	catppuccinStyle = catppuccin.Macchiato
 	rootStyle       = lipgloss.NewStyle().Background(catppuccinStyle.Base()).Width(40).Align(lipgloss.Center)
 	helpStyle       = lipgloss.NewStyle().Foreground(catppuccinStyle.Green()).Background(catppuccinStyle.Base()).Align(lipgloss.Left).Italic(true).Faint(true)
@@ -48,6 +49,7 @@ type model struct {
 
 func initialModel(choices []string) model {
 	var inputs []textinput.Model = make([]textinput.Model, 2)
+	// TODO: factor this stuff out
 	inputs[NEW_SESSION_INPUT] = textinput.New()
 	inputs[NEW_SESSION_INPUT].Placeholder = "New session name"
 	inputs[NEW_SESSION_INPUT].CharLimit = 20
@@ -158,6 +160,7 @@ func (m model) viewManageState() string {
 		}
 	}
 
+	// TODO: explore if this can be used instead of the manual cursor
 	choices = choices.Enumerator(blankEnumerator)
 
 	return rootStyle.Render(
