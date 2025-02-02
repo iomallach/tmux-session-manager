@@ -165,10 +165,11 @@ func (m model) viewManageState() string {
 
 	return rootStyle.Render(
 		fmt.Sprintf(
-			"%s\n%s\n%s\n%s\n%s",
+			"%s\n%s\n%s\n%s\n%s\n%s",
 			headerStyle.Render("Sessions:"),
 			listStyle.Render(choices.String()),
 			helpStyle.Render("q, ctrl+c: exit • d: kill session"),
+			helpStyle.Render("c: create session • r: rename session"),
 			helpStyle.Render("enter: switch session"),
 			helpStyle.Render("k, ctrl+p: up • j, ctrl+n: down"),
 		),
