@@ -44,7 +44,7 @@ type model struct {
 	focused Input
 }
 
-func InitialModel(choices []string) model {
+func InitialSessionModel() model {
 	var inputs []textinput.Model = make([]textinput.Model, 2)
 	// TODO: factor this stuff out
 	inputs[NEW_SESSION_INPUT] = textinput.New()
@@ -60,6 +60,8 @@ func InitialModel(choices []string) model {
 	inputs[RENAME_SESSION_INPUT].Width = 20
 	inputs[RENAME_SESSION_INPUT].Prompt = "➤"
 	inputs[RENAME_SESSION_INPUT].Validate = func(string) error { return nil }
+
+	choices := TmuxListSessions()
 
 	return model{choices: choices, state: MANAGE_STATE, inputs: inputs}
 }
