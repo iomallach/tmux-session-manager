@@ -2,6 +2,7 @@ package tsm
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -37,33 +38,50 @@ const (
 )
 
 type model struct {
-	choices []string
-	cursor  int
-	state   State
-	inputs  []textinput.Model
-	focused Input
+	choices         []string
+	cursor          int
+	state           State
+	inputs          []textinput.Model
+	focused         Input
+	filtering       bool
+	filtering_input textinput.Model
+}
+
+func createSessionInputBuble(placeholder string) textinput.Model {
+	input := textinput.New()
+	input.Placeholder = placeholder
+	input.CharLimit = 20
+	input.Width = 20
+	input.Prompt = "➤"
+	input.Validate = func(string) error { return nil }
+	return input
+}
+
+func createFilteringInputBubble() textinput.Model {
+	filtering_input := textinput.New()
+	filtering_input.Placeholder = "type to filter"
+	filtering_input.Width = 30
+	filtering_input.Prompt = "➤"
+	filtering_input.Validate = func(string) error { return nil }
+	return filtering_input
 }
 
 func InitialSessionModel() model {
 	var inputs []textinput.Model = make([]textinput.Model, 2)
 	// TODO: factor this stuff out
-	inputs[NEW_SESSION_INPUT] = textinput.New()
-	inputs[NEW_SESSION_INPUT].Placeholder = "New session name"
-	inputs[NEW_SESSION_INPUT].CharLimit = 20
-	inputs[NEW_SESSION_INPUT].Width = 20
-	inputs[NEW_SESSION_INPUT].Prompt = "➤"
-	inputs[NEW_SESSION_INPUT].Validate = func(string) error { return nil }
-
-	inputs[RENAME_SESSION_INPUT] = textinput.New()
-	inputs[RENAME_SESSION_INPUT].Placeholder = "Rename session"
-	inputs[RENAME_SESSION_INPUT].CharLimit = 20
-	inputs[RENAME_SESSION_INPUT].Width = 20
-	inputs[RENAME_SESSION_INPUT].Prompt = "➤"
-	inputs[RENAME_SESSION_INPUT].Validate = func(string) error { return nil }
+	inputs[NEW_SESSION_INPUT] = createSessionInputBuble("New session name")
+	inputs[RENAME_SESSION_INPUT] = createSessionInputBuble("Rename session")
+	filtering_input := createFilteringInputBubble()
 
 	choices := TmuxListSessions()
 
-	return model{choices: choices, state: MANAGE_STATE, inputs: inputs}
+	return model{
+		choices:         choices,
+		state:           MANAGE_STATE,
+		inputs:          inputs,
+		filtering:       false,
+		filtering_input: filtering_input,
+	}
 }
 
 func (m model) Init() tea.Cmd {
@@ -82,39 +100,65 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateManageState(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+p", "k":
-			if m.cursor > 0 {
-				m.cursor--
+		if m.filtering {
+			m.filtering_input.Focus()
+			switch msg.String() {
+			case "enter":
+				value := m.filtering_input.Value()
+				var filtered_choices []string
+				for _, choice := range m.choices {
+					if strings.HasPrefix(choice, value) {
+						filtered_choices = append(filtered_choices, choice)
+					}
+				}
+				m.choices = filtered_choices
+				m.filtering = false
+				m.filtering_input.Reset()
+			case "esc":
+				m.filtering = false
+				m.filtering_input.Reset()
 			}
-		case "ctrl+n", "j":
-			if m.cursor < len(m.choices)-1 {
-				m.cursor++
-			}
-		case "d":
-			err := TmuxKillSession(m.choices[m.cursor])
-			if err == nil {
-				m.choices = append(m.choices[:m.cursor], m.choices[m.cursor+1:]...)
-			}
-		case "enter":
-			err := TmuxSwitchSession(m.choices[m.cursor])
-			if err == nil {
+			m.filtering_input, cmd = m.filtering_input.Update(msg)
+		} else {
+			switch msg.String() {
+			case "ctrl+p", "k":
+				if m.cursor > 0 {
+					m.cursor--
+				}
+			case "ctrl+n", "j":
+				if m.cursor < len(m.choices)-1 {
+					m.cursor++
+				}
+			case "d":
+				err := TmuxKillSession(m.choices[m.cursor])
+				if err == nil {
+					m.choices = append(m.choices[:m.cursor], m.choices[m.cursor+1:]...)
+				}
+			case "enter":
+				err := TmuxSwitchSession(m.choices[m.cursor])
+				if err == nil {
+					return m, tea.Quit
+				}
+			case "c":
+				m.state = CREATE_STATE
+				m.focused = NEW_SESSION_INPUT
+			case "r":
+				m.state = RENAME_STATE
+				m.focused = RENAME_SESSION_INPUT
+			case "/":
+				m.filtering = true
+			case "esc":
+				m.choices = TmuxListSessions()
+			case "ctrl+c", "q":
 				return m, tea.Quit
 			}
-		case "c":
-			m.state = CREATE_STATE
-			m.focused = NEW_SESSION_INPUT
-		case "r":
-			m.state = RENAME_STATE
-			m.focused = RENAME_SESSION_INPUT
-		case "ctrl+c", "q":
-			return m, tea.Quit
 		}
 	}
 
-	return m, nil
+	return m, cmd
 }
 
 func (m model) updateInputState(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -162,17 +206,31 @@ func (m model) viewManageState() string {
 	// TODO: explore if this can be used instead of the manual cursor
 	choices = choices.Enumerator(blankEnumerator)
 
-	return rootStyle.Render(
-		fmt.Sprintf(
-			"%s\n%s\n%s\n%s\n%s\n%s",
-			headerStyle.Render("Sessions:"),
-			listStyle.Render(choices.String()),
-			helpStyle.Render("q, ctrl+c: exit • d: kill session"),
-			helpStyle.Render("c: create session • r: rename session"),
-			helpStyle.Render("enter: switch session"),
-			helpStyle.Render("k, ctrl+p: up • j, ctrl+n: down"),
-		),
-	)
+	if m.filtering {
+		return rootStyle.Render(
+			fmt.Sprintf(
+				"%s\n%s\n%s\n%s",
+				headerStyle.Render("Sessions:"),
+				listStyle.Render(choices.String()),
+				m.filtering_input.View(),
+				helpStyle.Render("enter: confirm • esc: cancel"),
+			),
+		)
+	} else {
+		return rootStyle.Render(
+			fmt.Sprintf(
+				"%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",
+				headerStyle.Render("Sessions:"),
+				listStyle.Render(choices.String()),
+				helpStyle.Render("q, ctrl+c: exit • d: kill session"),
+				helpStyle.Render("c: create session • r: rename session"),
+				helpStyle.Render("enter: switch session"),
+				helpStyle.Render("k, ctrl+p: up • j, ctrl+n: down"),
+				helpStyle.Render("/: search"),
+				helpStyle.Render("esc: reset search"),
+			),
+		)
+	}
 }
 
 func (m model) viewInputState() string {
