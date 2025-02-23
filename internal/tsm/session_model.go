@@ -118,9 +118,11 @@ func (m model) updateManageState(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.choices = filtered_choices
 				m.filtering = false
 				m.filtering_input.Reset()
+				return m, cmd
 			case "esc":
 				m.filtering = false
 				m.filtering_input.Reset()
+				return m, cmd
 			}
 			m.filtering_input, cmd = m.filtering_input.Update(msg)
 		} else {

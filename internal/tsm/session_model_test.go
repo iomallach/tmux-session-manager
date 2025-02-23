@@ -256,3 +256,45 @@ func TestQuitApp(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateFilteringInput(t *testing.T) {
+	tests := []struct {
+		input_updates            [][]rune
+		expected_filtering_input string
+		expected_filtering       bool
+	}{
+		{
+			[][]rune{{'t'}, {'e'}, {'s'}, {'t'}},
+			"test",
+			true,
+		},
+		{
+			[][]rune{{'t'}, {'e'}, {'s'}, {'t'}, {'e', 'n', 't', 'e', 'r'}}, // TODO: here need to additinally check "choices"
+			"",
+			false,
+		},
+		{
+			[][]rune{{'t'}, {'e'}, {'s'}, {'t'}, {'e', 's', 'c'}},
+			"",
+			false,
+		},
+	}
+
+	for _, test := range tests {
+		test_model := InitialSessionModel(&MockTmux{sessions: []string{"test_session_1", "test_session_2", "test_session_3"}})
+		test_model.state = MANAGE_STATE
+		test_model.filtering = true
+
+		var updModel tea.Model = test_model
+		for _, input := range test.input_updates {
+			msg := tea.Key{Type: tea.KeyRunes, Runes: input}
+			updModel, _ = updModel.Update(tea.KeyMsg(msg))
+		}
+		if updModel.(model).filtering_input.Value() != test.expected_filtering_input {
+			t.Fatalf("Expected filtering input to be %s, got %s", test.expected_filtering_input, updModel.(model).filtering_input.Value())
+		}
+		if updModel.(model).filtering != test.expected_filtering {
+			t.Fatalf("Expected filtering to be %v, got %v", test.expected_filtering, updModel.(model).filtering)
+		}
+	}
+}
