@@ -7,7 +7,19 @@ import (
 	"strings"
 )
 
-func TmuxListSessions() []string {
+type Tmuxer interface {
+	TmuxListSessions() []string
+	TmuxKillSession(session string) error
+	TmuxSwitchSession(session string) error
+	TmuxCreateSession(session string) error
+	TmuxRenameSession(oldSession string, session string) error
+}
+
+type Tmux struct {
+	sessions []string
+}
+
+func (tmux *Tmux) TmuxListSessions() []string {
 	cmd := exec.Command("tmux", "list-sessions")
 	out, err := cmd.Output()
 	if err != nil {
@@ -22,11 +34,12 @@ func TmuxListSessions() []string {
 			cleanedSessions = append(cleanedSessions, cleanedItem)
 		}
 	}
+	tmux.sessions = cleanedSessions
 
-	return cleanedSessions
+	return tmux.sessions
 }
 
-func TmuxKillSession(session string) error {
+func (tmux *Tmux) TmuxKillSession(session string) error {
 	cmd := exec.Command("tmux", "kill-session", "-t", session)
 	err := cmd.Run()
 	if err != nil {
@@ -37,7 +50,7 @@ func TmuxKillSession(session string) error {
 	return nil
 }
 
-func TmuxSwitchSession(session string) error {
+func (tmux *Tmux) TmuxSwitchSession(session string) error {
 	cmd := exec.Command("tmux", "switch-client", "-t", session)
 	err := cmd.Run()
 	if err != nil {
@@ -47,7 +60,7 @@ func TmuxSwitchSession(session string) error {
 	return nil
 }
 
-func TmuxCreateSession(session string) error {
+func (tmux *Tmux) TmuxCreateSession(session string) error {
 	cmd := exec.Command("tmux", "new-session", "-d", "-s", session)
 	err := cmd.Run()
 	if err != nil {
@@ -57,7 +70,7 @@ func TmuxCreateSession(session string) error {
 	return nil
 }
 
-func TmuxRenameSession(oldSession string, session string) error {
+func (tmux *Tmux) TmuxRenameSession(oldSession string, session string) error {
 	cmd := exec.Command("tmux", "rename-session", "-t", oldSession, session)
 	err := cmd.Run()
 	if err != nil {

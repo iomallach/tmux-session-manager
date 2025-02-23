@@ -18,7 +18,7 @@ var sessionCmd = cobra.Command{
 	Use:   "sessions",
 	Short: "Manage tmux sessions",
 	Run: func(cmd *cobra.Command, args []string) {
-		p := tea.NewProgram(tsm.InitialSessionModel())
+		p := tea.NewProgram(tsm.InitialSessionModel(&tsm.Tmux{}))
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Alas, there's been an error: %v", err)
 			os.Exit(1)

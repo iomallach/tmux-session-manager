@@ -45,6 +45,7 @@ type model struct {
 	focused         Input
 	filtering       bool
 	filtering_input textinput.Model
+	tmux            Tmuxer
 }
 
 func createSessionInputBuble(placeholder string) textinput.Model {
@@ -66,14 +67,13 @@ func createFilteringInputBubble() textinput.Model {
 	return filtering_input
 }
 
-func InitialSessionModel() model {
+func InitialSessionModel(tmux Tmuxer) model {
 	var inputs []textinput.Model = make([]textinput.Model, 2)
-	// TODO: factor this stuff out
 	inputs[NEW_SESSION_INPUT] = createSessionInputBuble("New session name")
 	inputs[RENAME_SESSION_INPUT] = createSessionInputBuble("Rename session")
 	filtering_input := createFilteringInputBubble()
 
-	choices := TmuxListSessions()
+	choices := tmux.TmuxListSessions()
 
 	return model{
 		choices:         choices,
@@ -81,6 +81,7 @@ func InitialSessionModel() model {
 		inputs:          inputs,
 		filtering:       false,
 		filtering_input: filtering_input,
+		tmux:            tmux,
 	}
 }
 
@@ -133,12 +134,12 @@ func (m model) updateManageState(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.cursor++
 				}
 			case "d":
-				err := TmuxKillSession(m.choices[m.cursor])
+				err := m.tmux.TmuxKillSession(m.choices[m.cursor])
 				if err == nil {
 					m.choices = append(m.choices[:m.cursor], m.choices[m.cursor+1:]...)
 				}
 			case "enter":
-				err := TmuxSwitchSession(m.choices[m.cursor])
+				err := m.tmux.TmuxSwitchSession(m.choices[m.cursor])
 				if err == nil {
 					return m, tea.Quit
 				}
@@ -151,7 +152,7 @@ func (m model) updateManageState(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "/":
 				m.filtering = true
 			case "esc":
-				m.choices = TmuxListSessions()
+				m.choices = m.tmux.TmuxListSessions()
 			case "ctrl+c", "q":
 				return m, tea.Quit
 			}
@@ -172,16 +173,16 @@ func (m model) updateInputState(msg tea.Msg) (tea.Model, tea.Cmd) {
 			sessionName := m.inputs[m.focused].Value()
 			switch m.focused {
 			case NEW_SESSION_INPUT:
-				err := TmuxCreateSession(sessionName)
+				err := m.tmux.TmuxCreateSession(sessionName)
 				if err == nil {
 					m.state = MANAGE_STATE
-					m.choices = TmuxListSessions()
+					m.choices = m.tmux.TmuxListSessions()
 				}
 			case RENAME_SESSION_INPUT:
-				err := TmuxRenameSession(m.choices[m.cursor], sessionName)
+				err := m.tmux.TmuxRenameSession(m.choices[m.cursor], sessionName)
 				if err == nil {
 					m.state = MANAGE_STATE
-					m.choices = TmuxListSessions()
+					m.choices = m.tmux.TmuxListSessions()
 				}
 			}
 		}

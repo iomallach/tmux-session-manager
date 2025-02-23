@@ -17,8 +17,8 @@ type rootModel struct {
 	activeModel tea.Model
 }
 
-func InitialRootModel() rootModel {
-	return rootModel{activeModel: InitialSessionModel()}
+func InitialRootModel(tmux Tmuxer) rootModel {
+	return rootModel{activeModel: InitialSessionModel(tmux)}
 }
 
 func (m rootModel) Init() tea.Cmd {
