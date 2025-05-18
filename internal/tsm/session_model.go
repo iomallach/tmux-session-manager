@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -57,6 +58,13 @@ func (km keyMap) FullHelp() [][]key.Binding {
 	}
 }
 
+func (km keyMap) FilteringHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{km.Enter},
+		{km.Quit},
+	}
+}
+
 var default_keys = keyMap{
 	CursorUp: key.NewBinding(
 		key.WithKeys("k", "ctrl+p"),
@@ -104,10 +112,11 @@ type model struct {
 	focused         Input
 	filtering       bool
 	filtering_input textinput.Model
+	help            help.Model
 	tmux            Tmuxer
 }
 
-func createSessionInputBuble(placeholder string) textinput.Model {
+func createSessionInputBubble(placeholder string) textinput.Model {
 	input := textinput.New()
 	input.Placeholder = placeholder
 	input.CharLimit = 20
@@ -128,8 +137,8 @@ func createFilteringInputBubble() textinput.Model {
 
 func InitialSessionModel(tmux Tmuxer) model {
 	inputs := make([]textinput.Model, 2)
-	inputs[NEW_SESSION_INPUT] = createSessionInputBuble("New session name")
-	inputs[RENAME_SESSION_INPUT] = createSessionInputBuble("Rename session")
+	inputs[NEW_SESSION_INPUT] = createSessionInputBubble("New session name")
+	inputs[RENAME_SESSION_INPUT] = createSessionInputBubble("Rename session")
 	filtering_input := createFilteringInputBubble()
 
 	choices := tmux.TmuxListSessions()
@@ -140,6 +149,7 @@ func InitialSessionModel(tmux Tmuxer) model {
 		inputs:          inputs,
 		filtering:       false,
 		filtering_input: filtering_input,
+		help:            help.New(),
 		tmux:            tmux,
 	}
 }
