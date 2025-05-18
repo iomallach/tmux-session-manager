@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -37,6 +38,64 @@ const (
 	RENAME_SESSION_INPUT
 )
 
+type keyMap struct {
+	CursorUp   key.Binding
+	CursorDown key.Binding
+	Delete     key.Binding
+	Enter      key.Binding
+	Create     key.Binding
+	Rename     key.Binding
+	Filter     key.Binding
+	Escape     key.Binding
+	Quit       key.Binding
+}
+
+func (km keyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{km.CursorUp, km.CursorDown, km.Create, km.Delete, km.Enter, km.Rename},
+		{km.Filter, km.Escape, km.Quit},
+	}
+}
+
+var default_keys = keyMap{
+	CursorUp: key.NewBinding(
+		key.WithKeys("k", "ctrl+p"),
+		key.WithHelp("ctrl+p/k", "move up"),
+	),
+	CursorDown: key.NewBinding(
+		key.WithKeys("j", "ctrl+n"),
+		key.WithHelp("ctrl+n/j", "move down"),
+	),
+	Delete: key.NewBinding(
+		key.WithKeys("d"),
+		key.WithHelp("d", "delete"),
+	),
+	Enter: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "switch session"),
+	),
+	Create: key.NewBinding(
+		key.WithKeys("c"),
+		key.WithHelp("c", "create session"),
+	),
+	Rename: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "rename session"),
+	),
+	Filter: key.NewBinding(
+		key.WithKeys("/"),
+		key.WithHelp("/", "search"),
+	),
+	Escape: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "reset search"),
+	),
+	Quit: key.NewBinding(
+		key.WithKeys("q", "ctrl+c"),
+		key.WithHelp("ctrl+c/q", "quit"),
+	),
+}
+
 type model struct {
 	choices         []string
 	cursor          int
@@ -68,7 +127,7 @@ func createFilteringInputBubble() textinput.Model {
 }
 
 func InitialSessionModel(tmux Tmuxer) model {
-	var inputs []textinput.Model = make([]textinput.Model, 2)
+	inputs := make([]textinput.Model, 2)
 	inputs[NEW_SESSION_INPUT] = createSessionInputBuble("New session name")
 	inputs[RENAME_SESSION_INPUT] = createSessionInputBuble("Rename session")
 	filtering_input := createFilteringInputBubble()
