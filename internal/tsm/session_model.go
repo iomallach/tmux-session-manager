@@ -16,7 +16,7 @@ import (
 var (
 	// TODO: tidy up styles
 	catppuccinStyle = catppuccin.Macchiato
-	rootStyle       = lipgloss.NewStyle().Background(catppuccinStyle.Base()).Width(40).Align(lipgloss.Center)
+	rootStyle       = lipgloss.NewStyle().Background(catppuccinStyle.Base()).Width(50).Align(lipgloss.Center)
 	helpStyle       = lipgloss.NewStyle().Foreground(catppuccinStyle.Green()).Background(catppuccinStyle.Base()).Align(lipgloss.Left).Italic(true).Faint(true)
 	headerStyle     = lipgloss.NewStyle().Background(catppuccinStyle.Base()).Bold(true).PaddingTop(1).PaddingBottom(1).Width(30).Align(lipgloss.Center)
 	selectedStyle   = lipgloss.NewStyle().Foreground(catppuccinStyle.Mauve()).Background(catppuccinStyle.Base())
@@ -39,7 +39,11 @@ const (
 	RENAME_SESSION_INPUT
 )
 
-type keyMap struct {
+type sessionKeymap struct {
+	ManageKeyMap manageKeyMap
+}
+
+type manageKeyMap struct {
 	CursorUp   key.Binding
 	CursorDown key.Binding
 	Delete     key.Binding
@@ -51,21 +55,50 @@ type keyMap struct {
 	Quit       key.Binding
 }
 
-func (km keyMap) FullHelp() [][]key.Binding {
+func (km manageKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{km.CursorUp, km.CursorDown, km.Create, km.Delete, km.Enter, km.Rename},
 		{km.Filter, km.Escape, km.Quit},
 	}
 }
 
-func (km keyMap) FilteringHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{km.Enter},
-		{km.Quit},
+func (km manageKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		km.Enter,
+		km.Quit,
 	}
 }
 
-var default_keys = keyMap{
+type filterKeyMap struct {
+	Enter  key.Binding
+	Escape key.Binding
+}
+
+func (km filterKeyMap) FullHelp() [][]key.Binding {
+	return [][]key.Binding{
+		{km.Enter, km.Escape},
+	}
+}
+
+func (km filterKeyMap) ShortHelp() []key.Binding {
+	return []key.Binding{
+		km.Enter,
+		km.Escape,
+	}
+}
+
+var default_filtering_keys = filterKeyMap{
+	Enter: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "switch session"),
+	),
+	Escape: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "reset search"),
+	),
+}
+
+var default_manage_keys = manageKeyMap{
 	CursorUp: key.NewBinding(
 		key.WithKeys("k", "ctrl+p"),
 		key.WithHelp("ctrl+p/k", "move up"),
@@ -113,6 +146,8 @@ type model struct {
 	filtering       bool
 	filtering_input textinput.Model
 	help            help.Model
+	manage_keys     manageKeyMap
+	filtering_keys  filterKeyMap
 	tmux            Tmuxer
 }
 
@@ -150,6 +185,8 @@ func InitialSessionModel(tmux Tmuxer) model {
 		filtering:       false,
 		filtering_input: filtering_input,
 		help:            help.New(),
+		manage_keys:     default_manage_keys,
+		filtering_keys:  default_filtering_keys,
 		tmux:            tmux,
 	}
 }
@@ -278,29 +315,27 @@ func (m model) viewManageState() string {
 	// TODO: explore if this can be used instead of the manual cursor
 	choices = choices.Enumerator(blankEnumerator)
 
+	m.help.ShowAll = true
 	if m.filtering {
-		return rootStyle.Render(
-			fmt.Sprintf(
-				"%s\n%s\n%s\n%s",
-				headerStyle.Render("Sessions:"),
-				listStyle.Render(choices.String()),
-				m.filtering_input.View(),
-				helpStyle.Render("enter: confirm • esc: cancel"),
+		return fmt.Sprintf(
+			"%s\n%s",
+			rootStyle.Render(
+				fmt.Sprintf(
+					"%s\n%s\n%s",
+					headerStyle.Render("Sessions:"),
+					listStyle.Render(choices.String()),
+					m.filtering_input.View(),
+				),
 			),
+			m.help.View(m.filtering_keys),
 		)
 	} else {
-		return rootStyle.Render(
-			fmt.Sprintf(
-				"%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s",
-				headerStyle.Render("Sessions:"),
-				listStyle.Render(choices.String()),
-				helpStyle.Render("q, ctrl+c: exit • d: kill session"),
-				helpStyle.Render("c: create session • r: rename session"),
-				helpStyle.Render("enter: switch session"),
-				helpStyle.Render("k, ctrl+p: up • j, ctrl+n: down"),
-				helpStyle.Render("/: search"),
-				helpStyle.Render("esc: reset search"),
+		return fmt.Sprintf(
+			"%s\n%s",
+			rootStyle.Render(
+				fmt.Sprintf("%s\n%s", headerStyle.Render("Sessions:"), listStyle.Render(choices.String())),
 			),
+			m.help.View(m.manage_keys),
 		)
 	}
 }
