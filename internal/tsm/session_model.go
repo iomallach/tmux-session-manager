@@ -40,7 +40,8 @@ const (
 )
 
 type sessionKeymap struct {
-	ManageKeyMap manageKeyMap
+	ManageKeyMap    manageKeyMap
+	FilteringKeyMap filterKeyMap
 }
 
 type manageKeyMap struct {
@@ -51,21 +52,20 @@ type manageKeyMap struct {
 	Create     key.Binding
 	Rename     key.Binding
 	Filter     key.Binding
-	Escape     key.Binding
 	Quit       key.Binding
+	Help       key.Binding
 }
 
 func (km manageKeyMap) FullHelp() [][]key.Binding {
 	return [][]key.Binding{
 		{km.CursorUp, km.CursorDown, km.Create, km.Delete, km.Enter, km.Rename},
-		{km.Filter, km.Escape, km.Quit},
+		{km.Filter, km.Quit},
 	}
 }
 
 func (km manageKeyMap) ShortHelp() []key.Binding {
 	return []key.Binding{
-		km.Enter,
-		km.Quit,
+		km.Help,
 	}
 }
 
@@ -81,16 +81,13 @@ func (km filterKeyMap) FullHelp() [][]key.Binding {
 }
 
 func (km filterKeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{
-		km.Enter,
-		km.Escape,
-	}
+	return []key.Binding{}
 }
 
 var default_filtering_keys = filterKeyMap{
 	Enter: key.NewBinding(
 		key.WithKeys("enter"),
-		key.WithHelp("enter", "switch session"),
+		key.WithHelp("enter", "apply filter"),
 	),
 	Escape: key.NewBinding(
 		key.WithKeys("esc"),
@@ -127,13 +124,13 @@ var default_manage_keys = manageKeyMap{
 		key.WithKeys("/"),
 		key.WithHelp("/", "search"),
 	),
-	Escape: key.NewBinding(
-		key.WithKeys("esc"),
-		key.WithHelp("esc", "reset search"),
-	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),
 		key.WithHelp("ctrl+c/q", "quit"),
+	),
+	Help: key.NewBinding(
+		key.WithKeys("?"),
+		key.WithHelp("?", "show help"),
 	),
 }
 
@@ -146,8 +143,7 @@ type model struct {
 	filtering       bool
 	filtering_input textinput.Model
 	help            help.Model
-	manage_keys     manageKeyMap
-	filtering_keys  filterKeyMap
+	sessKeyMap      sessionKeymap
 	tmux            Tmuxer
 }
 
@@ -177,6 +173,8 @@ func InitialSessionModel(tmux Tmuxer) model {
 	filtering_input := createFilteringInputBubble()
 
 	choices := tmux.TmuxListSessions()
+	help := help.New()
+	help.ShowAll = false
 
 	return model{
 		choices:         choices,
@@ -184,9 +182,8 @@ func InitialSessionModel(tmux Tmuxer) model {
 		inputs:          inputs,
 		filtering:       false,
 		filtering_input: filtering_input,
-		help:            help.New(),
-		manage_keys:     default_manage_keys,
-		filtering_keys:  default_filtering_keys,
+		help:            help,
+		sessKeyMap:      sessionKeymap{ManageKeyMap: default_manage_keys, FilteringKeyMap: default_filtering_keys},
 		tmux:            tmux,
 	}
 }
@@ -263,6 +260,8 @@ func (m model) updateManageState(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.choices = m.tmux.TmuxListSessions()
 			case "ctrl+c", "q":
 				return m, tea.Quit
+			case "?":
+				m.help.ShowAll = true
 			}
 		}
 	}
@@ -315,7 +314,6 @@ func (m model) viewManageState() string {
 	// TODO: explore if this can be used instead of the manual cursor
 	choices = choices.Enumerator(blankEnumerator)
 
-	m.help.ShowAll = true
 	if m.filtering {
 		return fmt.Sprintf(
 			"%s\n%s",
@@ -327,7 +325,7 @@ func (m model) viewManageState() string {
 					m.filtering_input.View(),
 				),
 			),
-			m.help.View(m.filtering_keys),
+			m.help.View(m.sessKeyMap.FilteringKeyMap),
 		)
 	} else {
 		return fmt.Sprintf(
@@ -335,7 +333,7 @@ func (m model) viewManageState() string {
 			rootStyle.Render(
 				fmt.Sprintf("%s\n%s", headerStyle.Render("Sessions:"), listStyle.Render(choices.String())),
 			),
-			m.help.View(m.manage_keys),
+			m.help.View(m.sessKeyMap.ManageKeyMap),
 		)
 	}
 }
